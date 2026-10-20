@@ -21,32 +21,41 @@ jobs:
         id: get_tag
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
-            TAG=${{ github.event.release.tag_name }}
+            TAG="${{ github.event.release.tag_name }}"
           else
-            TAG=${{ inputs.tag_name }}
+            TAG="${{ inputs.tag_name }}"
           fi
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: 下载 Release 中的 ZIP 附件
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG=${{ steps.get_tag.outputs.tag }}
-          ASSET_NAME=$(gh release view "$TAG" --json assets --jq '.assets[] | .name | select(endswith(".zip")) | select(startswith("Source code") | not)' | head -n 1)
+          TAG="${{ steps.get_tag.outputs.tag }}"
+          mkdir -p download
+          cd download
           
-          if [ -z "$ASSET_NAME" ]; then
-            echo "未找到目标 ZIP 文件"
+          # 下载所有 zip 格式附件
+          gh release download "$TAG" --pattern "*.zip"
+          
+          # 删除 GitHub 自动生成的源码包
+          rm -f "Source code.zip"
+          
+          # 取剩余第一个 ZIP 作为目标文件
+          ZIP_FILE=$(ls *.zip | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "错误：未找到目标 ZIP 文件"
+            ls -la
             exit 1
           fi
           
-          echo "正在下载：$ASSET_NAME"
-          gh release download "$TAG" --pattern "$ASSET_NAME"
-          echo "ZIP_NAME=$ASSET_NAME" >> $GITHUB_ENV
+          echo "找到目标文件：$ZIP_FILE"
+          echo "ZIP_PATH=download/$ZIP_FILE" >> "$GITHUB_ENV"
 
       - name: 解压 ZIP 文件
         run: |
           mkdir -p extracted
-          unzip -q "$ZIP_NAME" -d extracted
+          unzip -q "$ZIP_PATH" -d extracted
           echo "解压完成，文件列表："
           ls -la extracted
 
@@ -54,7 +63,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG=${{ steps.get_tag.outputs.tag }}
+          TAG="${{ steps.get_tag.outputs.tag }}"
           cd extracted
           zip -r -q ../extracted-release.zip .
           cd ..
