@@ -32,11 +32,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.get_tag.outputs.tag }}"
+          REPO="${{ github.repository }}"
           mkdir -p download
           cd download
           
-          # 下载所有 zip 格式附件
-          gh release download "$TAG" --pattern "*.zip"
+          # 显式指定仓库，无需本地 Git 环境
+          gh release download "$TAG" --repo "$REPO" --pattern "*.zip"
           
           # 删除 GitHub 自动生成的源码包
           rm -f "Source code.zip"
@@ -64,9 +65,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.get_tag.outputs.tag }}"
+          REPO="${{ github.repository }}"
           cd extracted
           zip -r -q ../extracted-release.zip .
           cd ..
           
-          gh release upload "$TAG" extracted-release.zip --clobber
+          gh release upload "$TAG" extracted-release.zip --repo "$REPO" --clobber
           echo "已将解压后的包上传到 Release $TAG"
